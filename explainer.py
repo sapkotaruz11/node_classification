@@ -53,7 +53,21 @@ loss = checkpoint["loss"]
 feat = model.input_feature()
 
 from dglnn_local.subgraphx import HeteroSubgraphX
+from dgl import khop_in_subgraph, khop_out_subgraph, node_subgraph
+import dgl
 
 explainer = HeteroSubgraphX(model, num_hops=1)
+# in_graph = khop_in_subgraph(g, {"d": [0]}, 1)[0]
+# out_graph = khop_out_subgraph(g, {"d": [0]}, 1)[0]
+# comb_graph = dgl.merge([in_graph, out_graph])
+# # exp_graph = node_subgraph(g, comb_graph.nodes)
+# data_dict = {}
+# for ntype in in_graph.ntypes:
+#     for i in in_graph.nodes[ntype].data:
+#         data_dict[ntype] = in_graph.nodes[ntype].data[i].tolist()
+# feat_1 = nn.ParameterDict()
+# for item in feat:
+#     feat_1[item] = feat[item][data_dict[item]]
+
 explanation = explainer.explain_graph(g, feat, target_class=1)
 print(explanation)

@@ -93,9 +93,9 @@ class SubgraphX(nn.Module):
         num_hops,
         coef=10.0,
         high2low=True,
-        num_child=12,
+        num_child=5,
         num_rollouts=20,
-        node_min=3,
+        node_min=5,
         shapley_steps=100,
         log=False,
     ):
@@ -413,10 +413,10 @@ class HeteroSubgraphX(nn.Module):
         coef=10.0,
         high2low=True,
         num_child=12,
-        num_rollouts=2,
+        num_rollouts=20,
         node_min=3,
         shapley_steps=100,
-        log=False,
+        log=True,
     ):
         super().__init__()
         self.num_hops = num_hops
@@ -511,14 +511,8 @@ class HeteroSubgraphX(nn.Module):
             }
 
             with torch.no_grad():
-                exclude_probs = self.model(self.graph, exclude_feat, **self.kwargs)[
-                    "d"
-                ].softmax(dim=-1)
-                exclude_value = exclude_probs[:, self.target_class]
-                include_probs = self.model(self.graph, include_feat, **self.kwargs)[
-                    "d"
-                ].softmax(dim=-1)
-                include_value = include_probs[:, self.target_class]
+                exclude_probs = self.model(self.graph, exclude_feat, **self.kwargs)["d"]
+                include_probs = self.model(self.graph, include_feat, **self.kwargs)["d"]
             marginal_contributions.append(include_probs - exclude_probs)
 
         return torch.cat(marginal_contributions).mean().item()
@@ -540,7 +534,6 @@ class HeteroSubgraphX(nn.Module):
             return mcts_node.children
 
         subg = node_subgraph(self.graph, mcts_node.nodes)
-        # subg = khop_in_subgraph(self.graph, {"Forschungsgruppen": [0]}, 1)[0]
         # Choose k nodes based on the highest degree in the subgraph
         node_degrees_map = {
             ntype: torch.zeros(subg.num_nodes(ntype), device=subg.nodes(ntype).device)
@@ -749,23 +742,26 @@ class HeteroSubgraphX(nn.Module):
         {'game': tensor([0, 1]), 'user': tensor([1, 2])}
         """
         self.model.eval()
-        self.graph = graph
-        exp_graph = khop_in_subgraph(self.graph, {"d": [0]}, 2)[0]
-        # self.graph = khop_in_subgraph(self.graph, {"game": [0]}, 1)[0]
+        exp_graph, inv_indecies = khop_in_subgraph(graph, {"d": 9193}, 1)
         assert (
             graph.num_nodes() > self.node_min
         ), f"The number of nodes in the\
             graph {graph.num_nodes()} should be bigger than {self.node_min}."
 
-        self.graph = graph
-        self.feat = feat
+        self.graph = exp_graph
+        sg_nodes = self.graph.ndata[NID]
+        sg_feat = {}
+
+        for node_type in sg_nodes.keys():
+            sg_feat[node_type] = feat[node_type][sg_nodes[node_type].long()]
+        self.feat = sg_feat
         self.target_class = target_class
         self.kwargs = kwargs
 
         # book all nodes in MCTS
         self.mcts_node_maps = dict()
 
-        root_dict = {ntype: exp_graph.nodes(ntype) for ntype in exp_graph.ntypes}
+        root_dict = {ntype: self.graph.nodes(ntype) for ntype in self.graph.ntypes}
         root = MCTSNode(root_dict)
         self.mcts_node_maps[str(root)] = root
 
