@@ -511,8 +511,12 @@ class HeteroSubgraphX(nn.Module):
             }
 
             with torch.no_grad():
-                exclude_probs = self.model(self.graph, exclude_feat, **self.kwargs)["d"]
-                include_probs = self.model(self.graph, include_feat, **self.kwargs)["d"]
+                exclude_probs = self.model(self.graph, exclude_feat, **self.kwargs)[
+                    self.category
+                ]
+                include_probs = self.model(self.graph, include_feat, **self.kwargs)[
+                    self.category
+                ]
             marginal_contributions.append(include_probs - exclude_probs)
 
         return torch.cat(marginal_contributions).mean().item()
@@ -653,7 +657,7 @@ class HeteroSubgraphX(nn.Module):
 
         return reward
 
-    def explain_node(self, graph, feat, **kwargs):
+    def explain_node(self, graph, feat, node_idx, category, **kwargs):
         r"""Find the most important subgraph from the original graph for the
         model to classify the graph into the target class.
 
@@ -742,7 +746,11 @@ class HeteroSubgraphX(nn.Module):
         {'game': tensor([0, 1]), 'user': tensor([1, 2])}
         """
         self.model.eval()
-        exp_graph, inv_indecies = khop_in_subgraph(graph, {"d": 9193}, 1)
+        self.category = category
+        self.node_idx = node_idx
+        exp_graph, inv_indecies = khop_in_subgraph(
+            graph, {self.category: self.node_idx}, 1
+        )
         assert (
             exp_graph.num_nodes() > self.node_min
         ), f"The number of nodes in the\
