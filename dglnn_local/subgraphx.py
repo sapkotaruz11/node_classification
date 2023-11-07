@@ -413,9 +413,9 @@ class HeteroSubgraphX(nn.Module):
         coef=10.0,
         high2low=True,
         num_child=12,
-        num_rollouts=20,
+        num_rollouts=10,
         node_min=3,
-        shapley_steps=100,
+        shapley_steps=20,
         log=True,
     ):
         super().__init__()
@@ -653,7 +653,7 @@ class HeteroSubgraphX(nn.Module):
 
         return reward
 
-    def explain_graph(self, graph, feat, target_class, **kwargs):
+    def explain_node(self, graph, feat, **kwargs):
         r"""Find the most important subgraph from the original graph for the
         model to classify the graph into the target class.
 
@@ -744,7 +744,7 @@ class HeteroSubgraphX(nn.Module):
         self.model.eval()
         exp_graph, inv_indecies = khop_in_subgraph(graph, {"d": 9193}, 1)
         assert (
-            graph.num_nodes() > self.node_min
+            exp_graph.num_nodes() > self.node_min
         ), f"The number of nodes in the\
             graph {graph.num_nodes()} should be bigger than {self.node_min}."
 
@@ -755,7 +755,6 @@ class HeteroSubgraphX(nn.Module):
         for node_type in sg_nodes.keys():
             sg_feat[node_type] = feat[node_type][sg_nodes[node_type].long()]
         self.feat = sg_feat
-        self.target_class = target_class
         self.kwargs = kwargs
 
         # book all nodes in MCTS
@@ -776,11 +775,11 @@ class HeteroSubgraphX(nn.Module):
         best_leaf = None
         best_immediate_reward = float("-inf")
         for mcts_node in self.mcts_node_maps.values():
-            if len(mcts_node.nodes) > self.node_min:
+            if len(mcts_node.nodes) < self.node_min:
                 continue
 
             if mcts_node.immediate_reward > best_immediate_reward:
                 best_leaf = mcts_node
                 best_immediate_reward = best_leaf.immediate_reward
 
-        return best_leaf.nodes
+        return best_leaf.nodes, exp_graph, inv_indecies, best_immediate_reward
