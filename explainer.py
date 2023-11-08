@@ -52,22 +52,42 @@ epoch = checkpoint["epoch"]
 loss = checkpoint["loss"]
 feat = model.input_feature()
 
-from dglnn_local.subgraphx import HeteroSubgraphX
-from dgl import khop_in_subgraph, khop_out_subgraph, node_subgraph
-import dgl
+# from dglnn_local.subgraphx import HeteroSubgraphX
+# from dgl import khop_in_subgraph, khop_out_subgraph, node_subgraph
+# import dgl
 
-explainer = HeteroSubgraphX(model, num_hops=1)
-# in_graph = khop_in_subgraph(g, {"d": [0]}, 1)[0]
-# out_graph = khop_out_subgraph(g, {"d": [0]}, 1)[0]
-# comb_graph = dgl.merge([in_graph, out_graph])
-# # exp_graph = node_subgraph(g, comb_graph.nodes)
-# data_dict = {}
-# for ntype in in_graph.ntypes:
-#     for i in in_graph.nodes[ntype].data:
-#         data_dict[ntype] = in_graph.nodes[ntype].data[i].tolist()
-# feat_1 = nn.ParameterDict()
-# for item in feat:
-#     feat_1[item] = feat[item][data_dict[item]]
+# explainer = HeteroSubgraphX(model, num_hops=1)
+# # in_graph = khop_in_subgraph(g, {"d": [0]}, 1)[0]
+# # out_graph = khop_out_subgraph(g, {"d": [0]}, 1)[0]
+# # comb_graph = dgl.merge([in_graph, out_graph])
+# # # exp_graph = node_subgraph(g, comb_graph.nodes)
+# # data_dict = {}
+# # for ntype in in_graph.ntypes:
+# #     for i in in_graph.nodes[ntype].data:
+# #         data_dict[ntype] = in_graph.nodes[ntype].data[i].tolist()
+# # feat_1 = nn.ParameterDict()
+# # for item in feat:
+# #     feat_1[item] = feat[item][data_dict[item]]
 
-explanation = explainer.explain_graph(g, feat, target_class=1)
-print(explanation)
+# explanation = explainer.explain_graph(g, feat, target_class=1)
+# print(explanation)
+from dglnn_local.pgexplainer import HeteroPGExplainer
+
+explainer = HeteroPGExplainer(
+    model, hidden_dim, num_hops=2, explain_graph=False, category=category
+)
+# Train the explainer
+# Define explainer temperature parameter
+# define and train the model
+# Train the explainer
+# Define explainer temperature parameter
+init_tmp, final_tmp = 5.0, 1.0
+optimizer_exp = th.optim.Adam(explainer.parameters(), lr=0.01)
+for epoch in range(20):
+    tmp = float(init_tmp * np.power(final_tmp / init_tmp, epoch / 20))
+    loss = explainer.train_step_node(
+        {ntype: g.nodes(ntype) for ntype in g.ntypes}, g, feat, tmp
+    )
+    optimizer_exp.zero_grad()
+    loss.backward()
+    optimizer_exp.step()
